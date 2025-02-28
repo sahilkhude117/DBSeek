@@ -8,7 +8,6 @@ import { generateObject } from "ai";
 
 export const generateQuery = async (input: string) => {
     "use server";
-
     try {
         const result = await generateObject({
             model: openai("gpt-4o"),
