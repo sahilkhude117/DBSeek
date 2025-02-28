@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from "react";
-import { motion , AnimatePresence } from "framer-motion"
-//actions
+import { motion , AnimatePresence } from "framer-motion";
 import { Config, Result } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,12 +10,8 @@ import { Search } from "@/components/search";
 import { SuggestedQueries } from "@/components/suggested-queries";
 import { QueryViewer } from "@/components/query-viewer";
 import { ProjectInfo } from "@/components/project-info";
-// project info
-// results
-// suggested queries
-// query viewer
-// search
-// header
+import { generateChartConfig, generateQuery, runGenerateSQLQuery } from "./actions";
+import { Results } from "@/components/results";
 
 export default function Page() {
   const [inputValue, setInputValue] = useState("");
@@ -42,8 +37,7 @@ export default function Page() {
     setActiveQuery("");
 
     try {
-      // const query = await generateQuery(question)
-      const query = "";
+      const query = await generateQuery(question);
       if (query === undefined) {
         toast.error("An error occured. Please try again.");
         setLoading(false);
@@ -51,14 +45,13 @@ export default function Page() {
       }
       setActiveQuery(query);
       setLoadingStep(2);
-      // const companies = await runGenerateSQLQuery(query);
-      const companies = ["a","b","c"];
+      const companies = await runGenerateSQLQuery(query);
       const columns = companies.length > 0 ? Object.keys(companies[0]) : [];
-      // setResults(companies);
+      setResults(companies);
       setColumns(columns);
       setLoading(false);
-      // const generation = await generateChartConfig(companies, question)
-      // setChartConfig(generation.config)
+      const generation = await generateChartConfig(companies, question)
+      setChartConfig(generation.config)
     } catch (e) {
       toast.error("An error occurred. Please try again.");
       setLoading(false);
@@ -146,8 +139,11 @@ export default function Page() {
                           </p>
                         </div>
                       ): (
-                        // <Results/>
-                        <></>
+                        <Results
+                            results={results}
+                            chartConfig={chartConfig}
+                            columns={colums}
+                        />
                       )}
                     </motion.div>
                   )}
