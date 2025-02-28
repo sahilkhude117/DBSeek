@@ -12,7 +12,7 @@ export const Header = ({ handleClear } : { handleClear: () => void }) => {
                 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center cursor-pointer"
                 onClick={() => handleClear()}
             >
-                Talk to PostgreSQL
+                DBSeek
             </h1>
             <div  className="flex items-center justify-center space-x-2">
                 <Button
@@ -28,7 +28,7 @@ export const Header = ({ handleClear } : { handleClear: () => void }) => {
                     <span>Toggle theme</span>
                 </Button>
             <div className="hidden sm:block">
-                {/* <NewButton /> */}
+                <NewButton />
             </div>
             </div>
         </div>
