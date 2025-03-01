@@ -45,7 +45,7 @@ export const Search = ({
                             Clear
                         </Button>
                     ):(
-                        <Button type="submit" className="w-full sm:w-auto">
+                        <Button type="submit" className="w-full sm:w-auto bg-green-500 hover:bg-green-800">
                             Send
                         </Button>
                     )}
