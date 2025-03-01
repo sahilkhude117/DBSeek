@@ -24,7 +24,6 @@ export const QueryViewer = ({
     setQueryExpanded(true);
     setLoadingExplanation(true);
     const { explanations } = await explainQuery(inputValue, activeQuery);
-    //@ts-ignore
     setQueryExplanations(explanations);
     setLoadingExplanation(false);
   };
