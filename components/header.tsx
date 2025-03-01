@@ -1,3 +1,4 @@
+'use client'
 import { Moon, Sun } from "lucide-react";
 import { NewButton } from "./new-button";
 import { Button } from "./ui/button";
@@ -14,7 +15,7 @@ export const Header = ({ handleClear } : { handleClear: () => void }) => {
             >
                 DBSeek
             </h1>
-            <div  className="flex items-center justify-center space-x-2">
+            {/* <div  className="flex items-center justify-center space-x-2">
                 <Button
                     variant="ghost"
                     size="icon"
@@ -28,9 +29,9 @@ export const Header = ({ handleClear } : { handleClear: () => void }) => {
                     <span>Toggle theme</span>
                 </Button>
             <div className="hidden sm:block">
-                <NewButton />
-            </div>
-            </div>
+                <NewButton /> */}
+            {/* </div> */}
+            {/* </div> */}
         </div>
     )
 };
