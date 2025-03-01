@@ -29,7 +29,7 @@ export const ProjectInfo = () => {
           </Link>
           .
           <div className="mt-4 sm:hidden">
-            <NewButton/>
+            {/* <NewButton/> */}
           </div>
         </AlertDescription>
       </Alert>
