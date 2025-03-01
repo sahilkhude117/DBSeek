@@ -2,6 +2,8 @@ import "./globals.css"
 import { GeistMono } from "geist/font/mono"
 import { GeistSans } from "geist/font/sans";
 import { ThemeProvider } from "next-themes";
+import { TableProvider } from "@/contexts/TableContext";
+import Navbar from "@/components/navbar";
 
 export const metadata = {
   metadataBase: new URL("http://localhost:3000"),
@@ -18,9 +20,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${GeistMono.className} ${GeistSans.className}`}>
+      <TableProvider>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
+        <Navbar />
+            {children}   
         </ThemeProvider>
+      </TableProvider>
       </body>
     </html>
   )
