@@ -1,47 +1,38 @@
-"use server"
 
 import { Config, configSchema, explainationSchema, Result } from "@/lib/types";
 import { openai } from "@ai-sdk/openai";
 import { sql } from "@vercel/postgres";
 import { z } from "zod";
 import { generateObject } from "ai";
+import { useTableContext } from "@/contexts/TableContext";
 
 export const generateQuery = async (input: string) => {
-    "use server";
+
+    const { tableName, tableSchema } = useTableContext();
+
+    if (!tableName || !tableSchema) {
+        throw new Error("Table name or schema not set in context. Please upload a CSV file first.");
+    }
+
+    
     try {
         const result = await generateObject({
             model: openai("gpt-4o"),
             system: `You are a SQL (postgres) and data visualization expert. Your job is to help the user write a SQL query to retrieve the data they need. The table schema is as follow:
             
-            unicorns (
-                id SERIAL PRIMARY KEY,
-                company VARCHAR(255) NOT NULL UNIQUE,
-                valuation DECIMAL(10, 2) NOT NULL,
-                date_joined DATE,
-                country VARCHAR(255) NOT NULL,
-                city VARCHAR(255) NOT NULL,
-                industry VARCHAR(255) NOT NULL,
-                select_investors TEXT NOT NULL
-            );
+            ${tableName} (
+                ${tableSchema}
+            )
 
             Only retrieval queries are allowed.
 
-            For things like industry, company names and other string fields, use the ILIKE operator and convert both the search term and the field to lowercase using LOWER() function. For example: LOWER(industry) ILIKE LOWER('%search_term%').
+            For string fields, use the ILIKE operator and convert both the search term and the field to lowercase using LOWER() function. For example: LOWER(column_name) ILIKE LOWER('%search_term%').
 
-            Note: select_investers is a comma-separated list of investors. Trim whitespace to ensure you're grouping properly. Note, some fields may be null or have only one value.
-            When answering questions about a specific field, ensure you are selecting the identifying column (ie. what is Vercel's valuation would select company and valuation').
+            Note: If a column contains comma-separated values, trim whitespace to ensure proper grouping.
+            EVERY QUERY SHOULD RETURN QUANTITATIVE DATA THAT CAN BE PLOTTED ON A CHART! There should always be at least two columns.
 
-            The industries available are:
-            - healthcare & life sciences
-            - consumer & retail
-            - financial services
-            - enterprise tech
-            - insurance
-            - media & entertainment
-            - industrials
-            - health
 
-            If the user asks for a category that is not in the list, infer based on the list above.
+            If the user asks for a category that is not in the list, infer based on the info you have.
 
             Note: valuation is in billions of dollars so 10b would be 10.0.
             Note: if the user asks for a rate, return it as a decimal. For example, 0.1 would be 10%.
@@ -67,7 +58,12 @@ export const generateQuery = async (input: string) => {
 };
 
 export const runGenerateSQLQuery = async (query: string) => {
-    "use server";
+    const { tableName, tableSchema } = useTableContext();
+
+    if (!tableName || !tableSchema) {
+        throw new Error("Table name or schema not set in context. Please upload a CSV file first.");
+    }
+
 
     // check for select statements
     if (
@@ -89,7 +85,7 @@ export const runGenerateSQLQuery = async (query: string) => {
     try {
         data = await sql.query(query);
     } catch (e:any) {
-        if (e.message.includes('relation "unicorns" does not exist')){
+        if (e.message.includes(`relation ${tableName} does not exist`)){
             console.log(
                 "Table does not exist, creating and seeding it with dummy data now...",
             );
@@ -104,7 +100,12 @@ export const runGenerateSQLQuery = async (query: string) => {
 };
 
 export const explainQuery = async (input: string, sqlQuery: string) => {
-    "use server";
+    const { tableName, tableSchema } = useTableContext();
+
+    if (!tableName || !tableSchema) {
+        throw new Error("Table name or schema not set in context. Please upload a CSV file first.");
+    }
+
     try {
         const result = await generateObject({
             model: openai("gpt-4o"),
@@ -113,16 +114,9 @@ export const explainQuery = async (input: string, sqlQuery: string) => {
             }),
             system: `You are SQL (postgres) expert. Your job is to explain to the user write a SQL query you wrote to retrieve the data they asked for. The table schema is as follows:
 
-            unicorns (
-                id SERIAL PRIMARY KEY,
-                company VARCHAR(255) NOT NULL UNIQUE,
-                valuation DECIMAL(10, 2) NOT NULL,
-                date_joined DATE,
-                country VARCHAR(255) NOT NULL,
-                city VARCHAR(255) NOT NULL,
-                industry VARCHAR(255) NOT NULL,
-                select_investors TEXT NOT NULL
-            );
+            ${tableName} (
+                ${tableSchema}
+            )
 
             When you explain you must take a section of the query, and then explain it. Each "section" should be unique. So in a query like: "SELECT * FROM unicorns limit 20", the sections could be "SELECT *", "FROM unicorns", "LIMIT 20".
             If a section does not have any explanation, include it, but leave the explanation empty.
@@ -148,7 +142,6 @@ export const generateChartConfig = async (
     results: Result[],
     userQuery: string,
 ) => {
-    "use server";
     const system = `You are a data visualization expert. `;
 
     try {
