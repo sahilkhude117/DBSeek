@@ -1,112 +1,99 @@
-
-import "dotenv/config";
-
 import { sql } from '@vercel/postgres';
 import fs from 'fs';
 import csv from 'csv-parser';
 import path from 'path';
+import "dotenv/config";
 
-// Function to parse date strings into YYYY-MM-DD format
-function parseDate(dateString: string): string | null {
-    const parts = dateString.split('/');
-    if (parts.length === 3) {
-        const day = parts[0].padStart(2, '0');
-        const month = parts[1].padStart(2, '0');
-        const year = parts[2];
-        return `${year}-${month}-${day}`;
-    }
-    console.warn(`Could not parse date: ${dateString}`);
-    return null;
+// Helper function to parse date strings into the correct format
+function parseDate(dateString: string): string {
+  const parts = dateString.split('-');
+  if (parts.length === 3) {
+    const day = parts[0].padStart(2, '0');
+    const month = parts[1].padStart(2, '0');
+    const year = parts[2];
+    return `${year}-${month}-${day}`;
+  }
+  console.warn(`Could not parse date: ${dateString}`);
+  throw new Error(`Invalid date format: ${dateString}`);
 }
 
-// Interface for column definition
-interface ColumnDefinition {
-    name: string;
-    type: string;
+// Function to clean and validate numeric values
+function parseValuation(valuation: string): number {
+  const cleanedValue = valuation.replace('$', '').replace(',', '');
+  const parsedValue = parseFloat(cleanedValue);
+  if (isNaN(parsedValue)) {
+    throw new Error(`Invalid valuation value: ${valuation}`);
+  }
+  return parsedValue;
 }
 
-// Function to seed the database dynamically
-export async function seed(csvFilePath: string, tableName: string): Promise<void> {
-    try {
-        // Read the CSV file and extract headers and sample rows
-        const results: Record<string, string>[] = [];
-        const columns: ColumnDefinition[] = [];
+export async function seed() {
+  try {
+    // Step 1: Create the table if it doesn't exist
+    await sql`
+      CREATE TABLE IF NOT EXISTS unicorns (
+        id SERIAL PRIMARY KEY,
+        company VARCHAR(255) NOT NULL UNIQUE,
+        valuation DECIMAL(10, 2) NOT NULL,
+        date_joined DATE,
+        country VARCHAR(255) NOT NULL,
+        city VARCHAR(255),
+        industry VARCHAR(255) NOT NULL,
+        select_investors TEXT NOT NULL
+      );
+    `;
+    console.log('Created "unicorns" table');
 
-        await new Promise<void>((resolve, reject) => {
-            fs.createReadStream(csvFilePath)
-                .pipe(csv())
-                .on('headers', (headers: string[]) => {
-                    // Infer column types from the first row of data
-                    headers.forEach((header) => {
-                        const sanitizedHeader = header.trim().replace(/[^a-zA-Z0-9_]/g, '_'); // Sanitize column names
-                        columns.push({ name: `"${sanitizedHeader}"`, type: 'VARCHAR(255)' }); // Default type
-                    });
-                })
-                .on('data', (data: Record<string, string>) => {
-                    results.push(data);
-                })
-                .on('end', resolve)
-                .on('error', reject);
-        });
+    // Step 2: Read and process the CSV file
+    const csvFilePath = path.join(process.cwd(), 'test.csv');
 
-        // Infer column types based on sample data
-        results.forEach((row) => {
-            Object.entries(row).forEach(([key, value]) => {
-                const column = columns.find((col) => col.name === `"${key.trim().replace(/[^a-zA-Z0-9_]/g, '_')}"`);
-                if (column && column.type === 'VARCHAR(255)') {
-                    if (!isNaN(parseFloat(value))) {
-                        column.type = 'DECIMAL(10, 2)';
-                    } else if (value.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
-                        column.type = 'DATE';
-                    }
-                }
-            });
-        });
+    await new Promise<void>((resolve, reject) => {
+      fs.createReadStream(csvFilePath)
+        .pipe(csv())
+        .on('data', async (row) => {
+          try {
+            // Parse and validate each row
+            const company = row.Company.trim();
+            const valuation = parseValuation(row['Valuation ($B)']);
+            const dateJoined = parseDate(row['Date Joined']);
+            const country = row.Country.trim();
+            const city = row.City.trim() || null; // Handle empty city fields
+            const industry = row.Industry.trim();
+            const selectInvestors = row['Select Investors'].trim();
 
-        // Create the table dynamically
-        const columnDefinitions = columns.map((col) => `${col.name} ${col.type}`).join(', ');
-        const createTableQuery = `
-            CREATE TABLE IF NOT EXISTS "${tableName}" (
-                id SERIAL PRIMARY KEY,
-                ${columnDefinitions}
-            );
-        `;
-        await sql.query(createTableQuery);
-        console.log(`Created '${tableName}' table`);
-
-        // Insert rows into the table
-        for (const row of results) {
-            const values = columns.map((col) => {
-                const columnName = col.name.replace(/"/g, ''); // Remove quotes for matching
-                const value = row[columnName];
-
-                if (col.type === 'DATE') {
-                    return parseDate(value) || null;
-                }
-                if (col.type === 'DECIMAL(10, 2)') {
-                    return value ? parseFloat(value.replace('$', '').replace(',', '')) || null : null;
-                }
-                return value || null; // Handle empty or undefined values
-            });
-
-            // Construct placeholders for the query
-            const placeholders = columns.map(() => '?').join(', ');
-            const columnNames = columns.map((col) => col.name).join(', ');
-
-            // Construct the query manually
-            const insertQuery = `
-                INSERT INTO "${tableName}" (${columnNames})
-                VALUES (${placeholders})
-                ON CONFLICT DO NOTHING;
+            // Insert the row into the database
+            await sql`
+              INSERT INTO unicorns (company, valuation, date_joined, country, city, industry, select_investors)
+              VALUES (
+                ${company},
+                ${valuation},
+                ${dateJoined},
+                ${country},
+                ${city},
+                ${industry},
+                ${selectInvestors}
+              )
+              ON CONFLICT (company) DO NOTHING;
             `;
 
-            // Execute the query with sanitized values
-            await sql.query(insertQuery, values);
-        }
+            console.log(`Inserted company: ${company}`);
+          } catch (error) {
+            console.error(`Error processing row: ${JSON.stringify(row)}`, error);
+          }
+        })
+        .on('end', () => {
+          console.log('Finished processing CSV file');
+          resolve();
+        })
+        .on('error', (error) => {
+          reject(error);
+        });
+    });
 
-        console.log(`Seeded ${results.length} rows into '${tableName}'`);
-    } catch (error) {
-        console.error('Error seeding database:', error);
-        throw error; // Re-throw the error for better debugging
-    }
+    console.log('Seeding completed successfully');
+  } catch (error) {
+    console.error('Error seeding database:', error);
+  }
 }
+
+seed().catch(console.error);
