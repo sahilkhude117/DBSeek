@@ -48,14 +48,14 @@ export default function Hero() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Button
+            {/* <Button
               size="lg"
               className="bg-green-400/50 hover:bg-green-600 text-white px-8"
               onClick={() => router.push('/chat')}
             >
               <FileText className="mr-2 h-5 w-5" />
               Upload Database
-            </Button>
+            </Button> */}
             <Button
               size="lg"
               variant="outline"
@@ -63,7 +63,7 @@ export default function Hero() {
               onClick={() => router.push('/chat')}
             >
               <Sparkles className="mr-2 h-5 w-5" />
-              See Examples
+              See Demo
             </Button>
           </motion.div>
         </div>
