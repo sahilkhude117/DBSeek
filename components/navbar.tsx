@@ -2,13 +2,20 @@
 
 import { Button } from "@/components/ui/button";
 import { Bot, Database, Menu } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import type React from "react"; // Added import for React
 import { useRouter } from "next/navigation";
+import { useSession, signIn, signOut } from 'next-auth/react';
+import { useState } from "react";
 
 export default function Navbar() {
     const router = useRouter();
+    const { data: session, status} = useSession();
+
   return (
     <motion.nav
       initial={{ y: -100 }}
@@ -28,16 +35,36 @@ export default function Navbar() {
       </div>
 
       <div className="hidden md:flex items-center space-x-4">
-        <Button onClick={() => {
+        {session ? (
+          <>
+            <Button 
+                  variant="ghost" 
+                  size='icon'
+                  className="relative h-12 w-12 text-[#2A5C8F] hover:bg-[#FFD700]/10"
+                  onClick={() => {
+                    if(window.confirm('Are you sure you want to logout?')) {
+                      signOut();
+                      router.push('/');
+                    }
+                  }}
+                >
+                <LogOut className="h-5 w-5 mr-2" />
+                </Button>
+          </>
+          ) : (
+          <>
+          <Button onClick={() => {
             router.push('/auth/login')
-        }} variant="ghost" className="text-white hover:text-green-400">
+          }} variant="ghost" className="text-white hover:text-green-400">
           Sign In
-        </Button>
-        <Button onClick={() => {
+          </Button>
+          <Button onClick={() => {
             router.push('/auth/signup')
-        }} className="bg-green-600 hover:bg-green-700 text-white">
-          Get Started
-        </Button>
+          }} className="bg-green-600 hover:bg-green-700 text-white">
+            Get Started
+          </Button>
+          </>
+      )}
       </div>
 
       <Button variant="ghost" size="icon" className="md:hidden text-white">
