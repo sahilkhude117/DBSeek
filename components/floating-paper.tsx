@@ -6,9 +6,13 @@ import { FileText } from "lucide-react";
 
 export function FloatingPaper({ count = 5 }) {
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // Update dimensions only on client side
+    // Set isClient to true after the component mounts on the client
+    setIsClient(true);
+
+    // Update dimensions only on the client side
     setDimensions({
       width: window.innerWidth,
       height: window.innerHeight,
@@ -24,6 +28,11 @@ export function FloatingPaper({ count = 5 }) {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  if (!isClient) {
+    // Render a placeholder or nothing until the client-side code runs
+    return null;
+  }
 
   return (
     <div className="relative w-full h-full">
@@ -50,7 +59,7 @@ export function FloatingPaper({ count = 5 }) {
           }}
           transition={{
             duration: 20 + Math.random() * 10,
-            repeat: Number.POSITIVE_INFINITY,
+            repeat: Infinity,
             ease: "linear",
           }}
         >
