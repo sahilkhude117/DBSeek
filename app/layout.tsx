@@ -7,7 +7,7 @@ import Navbar from "@/components/navbar";
 
 export const metadata = {
   metadataBase: new URL("http://localhost:3000"),
-  title: "Talk to Postgres",
+  title: "DBSeek",
   description:
     "Chat with a Postgres database using natural language."
 };
