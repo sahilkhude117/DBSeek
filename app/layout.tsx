@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans";
 import { ThemeProvider } from "next-themes";
 import { TableProvider } from "@/contexts/TableContext";
 import Navbar from "@/components/navbar";
+import { AuthProvider } from "./providers";
 
 export const metadata = {
   metadataBase: new URL("http://localhost:3000"),
@@ -21,10 +22,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${GeistMono.className} ${GeistSans.className}`}>
       <TableProvider>
+        <AuthProvider>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <Navbar />
             {children}   
         </ThemeProvider>
+      </AuthProvider>
       </TableProvider>
       </body>
     </html>
