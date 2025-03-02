@@ -1,9 +1,23 @@
 "use client";
+"use client";
 
 import { motion } from "framer-motion";
 import { Bot, Database } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export function RoboAnimation() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    // Set isClient to true after the component mounts on the client
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    // Render a placeholder or nothing until the client-side code runs
+    return null;
+  }
+
   return (
     <div className="relative w-full h-full">
       <motion.div
@@ -13,7 +27,7 @@ export function RoboAnimation() {
         }}
         transition={{
           duration: 4,
-          repeat: Number.POSITIVE_INFINITY,
+          repeat: Infinity,
           ease: "easeInOut",
         }}
       >
@@ -26,7 +40,7 @@ export function RoboAnimation() {
             }}
             transition={{
               duration: 4,
-              repeat: Number.POSITIVE_INFINITY,
+              repeat: Infinity,
               ease: "easeInOut",
             }}
           />
