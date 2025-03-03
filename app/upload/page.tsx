@@ -6,7 +6,7 @@ export default function Home() {
             <h1 className="text-2xl font-bold text-center">
                 Upload a CSV File
             </h1>
-            <FileUploader assetType="CSV_FILE" />
+            <FileUploader />
         </div>
     );
 }
