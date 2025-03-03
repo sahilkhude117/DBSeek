@@ -1,76 +1,80 @@
-import fs from "fs";
-import csvParser from "csv-parser";
-import { CsvFile } from "@/lib/asset-config";
-import { validateFile } from "@/lib/file-validation";
-import { seed } from "@/lib/seed";
+import { NextRequest, NextResponse } from "next/server";
+import { parseFile } from "@/lib/fileParser";
 
-// Function to infer column types based on sample data
-function inferColumnType(value: string): string {
-    if (!isNaN(parseFloat(value))) {
-        return 'DECIMAL(10, 2)';
-    }
-    if (value.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
-        return 'DATE';
-    }
-    return 'VARCHAR(255)';
-}
-
-export const POST = async(req: any, res: any) => {
-
+export async function POST(req: NextRequest) {
     try {
-        const { file, assetType } = req.body;
+        const formData = await req.formData();
+        const file = formData.get('file') as File;
 
-        // Validate the file
-        const validationResult = validateFile(assetType, file);
-
-        if (!validationResult.isValid) {
-            return res.status(400).json({ error: validationResult.error });
+        if (!file) {
+            return NextResponse.json({ error: "No file uploaded"}, { status: 400})
         }
 
-        console.log("File is valid. Uploading:", file.name);
+        const { columns, data } = await parseFile(file);
 
-        // Save the file temporarily
-        const tempFilePath = `/tmp/${file.name}`;
-        const fileBuffer = Buffer.from(file.data); // Assuming `file.data` contains the file buffer
-        fs.writeFileSync(tempFilePath, fileBuffer);
+        const columnTypes = inferColumnTypes(data[0]);
 
-        const tableName = "dynamic_data"; // Dynamic table name
-        const columns: { name: string; type: string }[] = [];
+        const schema = columns.map((col, index) => ({
+            name: col,
+            type: columnTypes[index],
+        }));
 
-        // Parse the CSV file to infer schema
-        await new Promise<void>((resolve, reject) => {
-            fs.createReadStream(tempFilePath)
-                .pipe(csvParser())
-                .on('headers', (headers: string[]) => {
-                    headers.forEach((header) => {
-                        columns.push({ name: header.trim(), type: 'VARCHAR(255)' }); // Default type
-                    });
-                })
-                .on('data', (data: Record<string, string>) => {
-                    Object.entries(data).forEach(([key, value]) => {
-                        const column = columns.find((col) => col.name === key);
-                        if (column && column.type === 'VARCHAR(255)') {
-                            column.type = inferColumnType(value);
-                        }
-                    });
-                })
-                .on('end', resolve)
-                .on('error', reject);
-        });
-
-        // Seed the data into the database
-        await seed(tempFilePath, tableName);
-
-        console.log(`Database seeded successfully with table '${tableName}'`);
-
-        // Generate the schema string
-        const tableSchema = columns.map((col) => `"${col.name}" ${col.type}`).join(', ');
-
-        // Return the table name and schema
-        return res.status(200).json({ tableName, tableSchema });
-
-    } catch (error) {
-        console.error("Error during file seeding:", error);
-        return res.status(500).json({ error: "An error occurred while processing the file." });
+        return NextResponse.json({
+            schema
+        })
+    } catch (e) {
+        console.error('Error processing file:', e);
+        return NextResponse.json({ error: 'Failed to process file' }, { status: 500 });
     }
+}
+
+
+/**
+ * Infers column types based on sample data and maps them to PostgreSQL-compatible types.
+ * @param rowData - The first row of data from the file.
+ * @returns An array of inferred PostgreSQL types (e.g., 'INTEGER', 'TEXT', etc.).
+ */
+function inferColumnTypes(rowData: Record<string, any>): string[] {
+    return Object.values(rowData).map((value) => {
+      if (value === null || value === undefined || value === '') {
+        // Default to TEXT for null or empty values
+        return 'TEXT';
+      }
+  
+      if (!isNaN(Number(value))) {
+        // Check if the number is an integer or a decimal
+        const num = Number(value);
+        return Number.isInteger(num) ? 'INTEGER' : 'NUMERIC';
+      }
+  
+      if (typeof value === 'string') {
+        // Check if the string is a valid date
+        const date = new Date(value);
+        if (!isNaN(date.getTime())) {
+          return date.toTimeString() === '00:00:00 GMT+0000 (Coordinated Universal Time)'
+            ? 'DATE' // Only date (no time)
+            : 'TIMESTAMP'; // Includes time
+        }
+  
+        // Check if the string is a boolean ("true"/"false")
+        if (value.toLowerCase() === 'true' || value.toLowerCase() === 'false') {
+          return 'BOOLEAN';
+        }
+  
+        // Default to TEXT for other strings
+        return 'TEXT';
+      }
+  
+      if (typeof value === 'boolean') {
+        return 'BOOLEAN';
+      }
+  
+      // Handle arrays (e.g., JSONB in PostgreSQL)
+      if (Array.isArray(value)) {
+        return 'JSONB';
+      }
+  
+      // Fallback for unknown types
+      return 'TEXT';
+    });
 }
