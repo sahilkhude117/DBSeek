@@ -1,19 +1,25 @@
-import { useTableContext } from "@/contexts/TableContext";
-import { processCsv } from "@/lib/processCsv";
+'use client'
+import axios from 'axios';
+import { useState } from 'react';
 
-export const uploadFile = async (assetType: string, file: File): Promise<void> => {
-    try {
-        // Process the CSV file
-        const { tableName, tableSchema } = await processCsv(file);
+export async function uploadFile(file: File) {
+  try {
+    // Create a FormData object
+    const formData = new FormData();
+    formData.append('file', file); // Use the key 'file' as expected by the API
 
-        // Update the context with the table name and schema
-        const { setTableName, setTableSchema } = useTableContext();
-        setTableName(tableName);
-        setTableSchema(tableSchema);
+    // Make the POST request to the /api/upload endpoint
+    const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data', // Set the correct content type
+      },
+    });
 
-        console.log(`File uploaded and database seeded successfully with table '${tableName}'`);
-    } catch (error) {
-        console.error("Error during file upload:", error);
-        throw new Error("An error occurred while processing the file.");
-    }
-};
+    // Log the response from the server
+    console.log('Upload successful:', response.data);
+    return response.data.schema;
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    throw error;
+  }
+}
