@@ -1,98 +1,75 @@
-'use server';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 
-import fs from 'fs';
-import path from 'path';
-import * as xlsx from 'xlsx';
-import csvParser from 'csv-parser';
-import { generateSqlSchema } from '@/app/actions';
-import { updateDatabase } from './updateDatabase';
+/**
+ * Parses a file (CSV or XLSX) and extracts columns and data.
+ * @param file - The uploaded file.
+ * @returns An object containing `columns` (array of column names) and `data` (array of rows).
+*/
 
-export async function fileParse(file: File): Promise<void> {
-    // Ensure the uploads directory exists
-    const uploadDir = path.join(process.cwd(), 'uploads');
-    await fs.promises.mkdir(uploadDir, { recursive: true });
+export async function parseFile(file: File): Promise<{ columns: string[]; data: Record<string, any>[]}> {
+    const fileType = file.name.split('.').pop()?.toLowerCase();
 
-    // Create the temporary file path
-    const tempFilePath = path.join(uploadDir, file.name);
-
-    // Write the uploaded file to the temporary file path
-    await fs.promises.writeFile(tempFilePath, Buffer.from(await file.arrayBuffer()));
-
-    let tableData: Record<string, any>[] = [];
-    let tableData1: Record<string, any>[] = [];
-
-    const fileExtension = path.extname(file.name).toLowerCase();
-
-    if (fileExtension === '.csv') {
-        tableData1 = await parseCsvLite(tempFilePath);
-    } else if (fileExtension === '.xlsx') {
-        tableData1 = await parseXlsxLite(tempFilePath);
+    if (fileType === 'csv') {
+        return parseCSV(file);
+    } else if (['xlsx', 'xls'].includes(fileType || '')) {
+        return parseXLSX(file);
     } else {
-        throw new Error('Unsupported file format');
+        throw new Error('Unsupported file type. Please upload a CSV or XLSX file.');
+    }
+}
+
+/**
+ * Parses a CSV file using PapaParse.
+ * @param file - The uploaded CSV file.
+ * @returns An object containing `columns` and `data`.
+*/
+
+async function parseCSV(file: File): Promise<{ columns: string[]; data: Record<string, any>[] }> {
+    const text = await file.text();
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true});
+
+    if (!parsed.meta.fields) {
+        throw new Error('Unable to parse CSV file. No columns found.');
     }
 
-    const tablename = file.name.split('.')[0];
-    const tableSchema = await generateSqlSchema(tablename, tableData1);
+    return {
+        columns: parsed.meta.fields,
+        data: parsed.data as Record<string, any>[],
+    };
+}
 
-    if (fileExtension === '.csv') {
-        tableData = await parseCsv(tempFilePath);
-    } else if (fileExtension === '.xlsx') {
-        tableData = await parseXlsx(tempFilePath);
-    } else {
-        throw new Error('Unsupported file format');
+/**
+ * Parses an XLSX file using the `xlsx` library.
+ * @param file - The uploaded XLSX file.
+ * @returns An object containing `columns` and `data`.
+*/
+
+async function parseXLSX(file: File): Promise<{ columns: string[]; data: Record<string, any>[] }> {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+  
+    // Convert worksheet to JSON
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as Array<Array<any>>;
+  
+    if (jsonData.length === 0) {
+      throw new Error('Unable to parse XLSX file. No data found.');
     }
-
-    await updateDatabase(tablename, tableSchema, tableData);
-
-    // Clean up the temporary file
-    await fs.promises.unlink(tempFilePath);
-}
-
-async function parseCsvLite(filePath: string): Promise<Record<string, any>[]> {
-    return new Promise((resolve, reject) => {
-        const results: Record<string, any>[] = [];
-        let rowCount = 0;
-        const maxRows = 20;
-
-        fs.createReadStream(filePath)
-            .pipe(csvParser())
-            .on('data', (row) => {
-                if (rowCount < maxRows) {
-                    results.push(row);
-                    rowCount++;
-                }
-            })
-            .on('end', () => resolve(results))
-            .on('error', reject);
-    });
-}
-
-async function parseCsv(filePath: string): Promise<Record<string, any>[]> {
-    return new Promise((resolve, reject) => {
-        const results: Record<string, any>[] = [];
-
-        fs.createReadStream(filePath)
-            .pipe(csvParser())
-            .on('data', (row) => results.push(row))
-            .on('end', () => resolve(results))
-            .on('error', reject);
-    });
-}
-
-async function parseXlsxLite(filePath: string): Promise<Record<string, any>[]> {
-    const workbook = xlsx.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const range = { s: { c: 0, r: 0 }, e: { c: 100, r: 50 } }; // Adjust range as needed
-    const limitedSheet = xlsx.utils.sheet_to_json(sheet, { range });
-
-    return limitedSheet as Record<string, any>[];
-}
-
-async function parseXlsx(filePath: string): Promise<Record<string, any>[]> {
-    const workbook = xlsx.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-
-    return xlsx.utils.sheet_to_json(sheet);
-}
+  
+    const [headerRow, ...rows] = jsonData;
+  
+    // Extract columns from the header row
+    const columns = headerRow.map((col: any) => String(col));
+  
+    // Map rows to objects with column names as keys
+    const data = rows.map((row: Array<any>) =>
+      row.reduce((obj, value, index) => {
+        obj[columns[index]] = value;
+        return obj;
+      }, {} as Record<string, any>)
+    );
+  
+    return { columns, data };
+  }
